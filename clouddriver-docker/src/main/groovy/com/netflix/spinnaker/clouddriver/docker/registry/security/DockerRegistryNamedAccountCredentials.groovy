@@ -19,6 +19,7 @@ package com.netflix.spinnaker.clouddriver.docker.registry.security
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.netflix.spinnaker.clouddriver.docker.registry.api.v2.client.DockerRegistryClient
 import com.netflix.spinnaker.clouddriver.docker.registry.exception.DockerRegistryConfigException
+import com.netflix.spinnaker.clouddriver.docker.registry.metrics.UrlMetricsInstrumentation
 import com.netflix.spinnaker.clouddriver.security.AccountCredentials
 import groovy.util.logging.Slf4j
 import retrofit.RetrofitError
@@ -44,6 +45,7 @@ class DockerRegistryNamedAccountCredentials implements AccountCredentials<Docker
     boolean trackDigests
     boolean sortTagsByDate
     boolean insecureRegistry
+    UrlMetricsInstrumentation urlMetricsInstrumentation
     List<String> repositories
     List<String> skip
     String catalogFile
@@ -140,6 +142,11 @@ class DockerRegistryNamedAccountCredentials implements AccountCredentials<Docker
       return this
     }
 
+    Builder urlMetricsInstrumentation(UrlMetricsInstrumentation urlMetricsInstrumentation) {
+      this.urlMetricsInstrumentation = urlMetricsInstrumentation
+      return this
+    }
+
     Builder repositories(List<String> repositories) {
       this.repositories = repositories
       return this
@@ -174,7 +181,8 @@ class DockerRegistryNamedAccountCredentials implements AccountCredentials<Docker
                                                        trackDigests,
                                                        sortTagsByDate,
                                                        catalogFile,
-                                                       insecureRegistry)
+                                                       insecureRegistry,
+                                                       urlMetricsInstrumentation)
     }
   }
 
@@ -196,7 +204,8 @@ class DockerRegistryNamedAccountCredentials implements AccountCredentials<Docker
                                         boolean trackDigests,
                                         boolean sortTagsByDate,
                                         String catalogFile,
-                                        boolean insecureRegistry) {
+                                        boolean insecureRegistry,
+                                        UrlMetricsInstrumentation urlMetricsInstrumentation) {
     this(accountName,
          environment,
          accountType,
@@ -216,6 +225,7 @@ class DockerRegistryNamedAccountCredentials implements AccountCredentials<Docker
          sortTagsByDate,
          catalogFile,
          insecureRegistry,
+         urlMetricsInstrumentation,
          null)
   }
 
@@ -238,6 +248,7 @@ class DockerRegistryNamedAccountCredentials implements AccountCredentials<Docker
                                         boolean sortTagsByDate,
                                         String catalogFile,
                                         boolean insecureRegistry,
+                                        UrlMetricsInstrumentation urlMetricsInstrumentation,
                                         List<String> requiredGroupMembership) {
     if (!accountName) {
       throw new IllegalArgumentException("Docker Registry account must be provided with a name.")
@@ -283,7 +294,8 @@ class DockerRegistryNamedAccountCredentials implements AccountCredentials<Docker
     this.email = email
     this.trackDigests = trackDigests
     this.sortTagsByDate = sortTagsByDate
-    this.insecureRegistry = insecureRegistry;
+    this.insecureRegistry = insecureRegistry
+    this.urlMetricsInstrumentation = urlMetricsInstrumentation
     this.skip = skip ?: []
     this.requiredGroupMembership = requiredGroupMembership == null ? Collections.emptyList() : Collections.unmodifiableList(requiredGroupMembership)
     this.credentials = buildCredentials(repositories, catalogFile)
@@ -343,6 +355,7 @@ class DockerRegistryNamedAccountCredentials implements AccountCredentials<Docker
         .paginateSize(paginateSize)
         .catalogFile(catalogFile)
         .insecureRegistry(insecureRegistry)
+        .urlMetricsInstrumentation(urlMetricsInstrumentation)
         .build()
 
       return new DockerRegistryCredentials(client, repositories, trackDigests, skip, sortTagsByDate)
@@ -374,6 +387,7 @@ class DockerRegistryNamedAccountCredentials implements AccountCredentials<Docker
   final long clientTimeoutMillis
   final int paginateSize
   final boolean insecureRegistry
+  final UrlMetricsInstrumentation urlMetricsInstrumentation
   @JsonIgnore
   final DockerRegistryCredentials credentials
   final List<String> requiredGroupMembership
