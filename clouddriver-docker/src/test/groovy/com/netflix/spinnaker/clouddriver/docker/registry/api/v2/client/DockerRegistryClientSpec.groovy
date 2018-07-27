@@ -94,18 +94,23 @@ class DockerRegistryClientSpec extends Specification {
     1 * client.registryService.getTags(_, _, userAgent)
   }
 
-  void "DockerRegistryClient emits Spectator metrics when calling an URL"() {
+  void "DockerRegistryClient emits Spectator metrics when calling getTags on library/ubuntu"() {
     given:
-      def url_path = '/v2/' + REPOSITORY1 + '/tags/list'
+      def operation = "tags/list"
       client = new DockerRegistryClient(REGISTRY_URL, "", "", "", TimeUnit.MINUTES.toMillis(1), 100, "", true, urlMetricsInstrumentation)
       urlMetricsInstrumentation.log = Mock(Logger)
+
+      Map<String, String> tags = new HashMap<>()
+      tags.put("registry", REGISTRY_HOST)
+      tags.put("repository", REPOSITORY1.split("/")[0])
+      tags.put("image", REPOSITORY1.split("/")[1])
+      tags.put("operation", operation)
     when:
       client.getTags(REPOSITORY1)
     then:
-      // The endpoint gets called twice; first with a 401, then with a 200. They both get logged and metered, so:
-      registry.timer(urlMetricsInstrumentation.getTimingId().withTag('host', REGISTRY_HOST).withTag('path', url_path)).totalTime() > 0
-      registry.counter(urlMetricsInstrumentation.getCounterId().withTag('host', REGISTRY_HOST).withTag('path', url_path).withTag('successful', true)).count() == 1
-      registry.counter(urlMetricsInstrumentation.getCounterId().withTag('host', REGISTRY_HOST).withTag('path', url_path).withTag('successful', false)).count() == 1
+      // The endpoint gets called twice; first with a 401, then with a 200 (after obtaining a token). They both get logged and metered, so:
+      registry.timer(urlMetricsInstrumentation.getTimingId().withTags(tags).withTag("statusCode", "4xx").withTag("success", "false")).count() == 1
+      registry.timer(urlMetricsInstrumentation.getTimingId().withTags(tags).withTag("statusCode", "2xx").withTag("success", "true")).count() == 1
       2 * urlMetricsInstrumentation.log.info(_ as String)
   }
 }
